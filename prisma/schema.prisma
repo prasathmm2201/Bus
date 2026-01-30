@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum BusType {
+  AC
+  NON_AC
+  SLEEPER
+  SEATER
+}
+
+enum SeatLayout {
+  TWO_BY_ONE @map("2+1")
+  TWO_BY_TWO @map("2+2")
+  SLEEPER
+  MIXED
+}
+
+enum SeatType {
+  SEATER
+  SLEEPER
+}
+
+enum Deck {
+  LOWER
+  UPPER
+}
+
+
+enum SeatStatus {
+  available
+  booked
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  SUCCESS
+  FAILED
+  PENDING
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+  WALLET
+}
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String?   @db.VarChar(100)
+  mobile_no     String?   @unique @db.VarChar(15)
+  country_code  String?   @db.VarChar(5)
+  email         String?   @unique @db.VarChar(150)
+  password      String?
+  role          Role      @default(USER)
+  is_delete     Boolean   @default(false)
+  authenticated Boolean   @default(false)
+  state         String?   @db.VarChar(50)
+  gender        Gender?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  passengers    Passenger[]
+  bookings      Booking[]
+
+  @@map("users")
+}
+
+model Otp {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  mobile_no  String   @db.VarChar(15)
+  code       String   @db.VarChar(6)
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([mobile_no])
+  @@map("otps")
+}
+
+model Passenger {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String    @db.VarChar(100)
+  age        Int
+  gender     Gender
+  created_by String    @db.Uuid
+  is_active  Boolean   @default(true)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  user       User      @relation(fields: [created_by], references: [id])
+  booking_passengers BookingPassenger[]
+
+  @@map("passengers")
+}
+
+model Bus {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String     @db.VarChar(100)
+  type        BusType    @default(NON_AC)
+  is_ac       Boolean    @default(false)
+  is_sleeper  Boolean    @default(false)
+  is_seater   Boolean    @default(false)
+  seat_layout SeatLayout @default(TWO_BY_ONE)
+  total_seats Int
+  images      String[]   @default([])
+  created_at  DateTime   @default(now())
+  updated_at  DateTime   @updatedAt
+
+  schedules      Schedule[]
+  bookings       Booking[]
+  template_seats BusTemplateSeat[]
+
+  @@map("buses")
+}
+
+
+model City {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String   @unique @db.VarChar(100)
+  state      String   @db.VarChar(100)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  route_via_cities RouteViaCity[]
+  boarding_points  BoardingPoint[]
+  
+  routes_from      Route[]         @relation("FromCity")
+  routes_to        Route[]         @relation("ToCity")
+
+  @@map("cities")
+}
+
+model Route {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_city_id String     @db.Uuid
+  to_city_id   String     @db.Uuid
+  distance_km  Int
+  created_at   DateTime   @default(now())
+  updated_at   DateTime   @updatedAt
+
+  from_city    City       @relation("FromCity", fields: [from_city_id], references: [id])
+  to_city      City       @relation("ToCity", fields: [to_city_id], references: [id])
+
+  schedules   Schedule[]
+  via_cities       RouteViaCity[]
+  boarding_points  RouteBoardingPoint[]
+  dropping_points  RouteDroppingPoint[]
+
+  @@map("routes")
+}
+
+model RouteViaCity {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  route_id  String   @db.Uuid
+  city_id   String   @db.Uuid
+  order     Int
+  arrival_time String? @db.VarChar(10)
+  is_next_day  Boolean @default(false)
+  is_pickup    Boolean @default(true)
+
+  route     Route    @relation(fields: [route_id], references: [id], onDelete: Cascade)
+  city      City     @relation(fields: [city_id], references: [id])
+
+  @@map("route_via_cities")
+}
+
+model BoardingPoint {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(100)
+  city_id   String   @db.Uuid
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  city      City     @relation(fields: [city_id], references: [id])
+  route_boardings RouteBoardingPoint[]
+  route_droppings RouteDroppingPoint[]
+
+  @@unique([name, city_id])
+  @@map("boarding_points")
+}
+
+model RouteBoardingPoint {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  route_id         String        @db.Uuid
+  boarding_point_id String       @db.Uuid
+  order            Int
+  time             String?       @db.VarChar(10)
+  is_next_day      Boolean       @default(false)
+
+  route            Route         @relation(fields: [route_id], references: [id], onDelete: Cascade)
+  boarding_point   BoardingPoint @relation(fields: [boarding_point_id], references: [id])
+
+  @@map("route_boarding_points")
+}
+
+model RouteDroppingPoint {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  route_id         String        @db.Uuid
+  dropping_point_id String       @db.Uuid
+  order            Int
+  time             String?       @db.VarChar(10)
+  is_next_day      Boolean       @default(false)
+
+  route            Route         @relation(fields: [route_id], references: [id], onDelete: Cascade)
+  dropping_point   BoardingPoint @relation(fields: [dropping_point_id], references: [id])
+
+  @@map("route_dropping_points")
+}
+
+
+model BusTemplateSeat {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bus_id      String    @db.Uuid
+  seat_number String    @db.VarChar(10)
+  type        SeatType  @default(SEATER)
+  deck        Deck      @default(LOWER)
+  row         Int
+  col         Int
+  price       Decimal?  @db.Decimal(10, 2)
+  
+  bus         Bus       @relation(fields: [bus_id], references: [id])
+
+  @@map("bus_template_seats")
+}
+
+
+model Schedule {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  route_id       String    @db.Uuid
+  bus_id         String    @db.Uuid
+  departure_time DateTime
+  arrival_time   DateTime
+  price          Decimal   @db.Decimal(10, 2)
+  addon_amount   Decimal   @default(0) @db.Decimal(10, 2)
+  discount_percentage Decimal @default(0) @db.Decimal(5, 2)
+  is_pickup      Boolean   @default(true)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  route          Route     @relation(fields: [route_id], references: [id])
+  bus            Bus       @relation(fields: [bus_id], references: [id])
+  seats          ScheduleSeat[]
+  bookings       Booking[]
+
+  @@map("schedules")
+}
+
+model ScheduleSeat {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  schedule_id    String     @db.Uuid
+  bus_id         String     @db.Uuid
+  route_id       String     @db.Uuid
+  template_seat_id String?   @db.Uuid
+  seat_number    String     @db.VarChar(10)
+  status         SeatStatus @default(available)
+  gender_lock    Gender?
+  type           SeatType   @default(SEATER)
+  deck           Deck       @default(LOWER)
+  row            Int        @default(0)
+  col            Int        @default(0)
+  price          Decimal    @db.Decimal(10, 2)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  schedule       Schedule   @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  booking_passengers BookingPassenger[]
+
+  @@map("schedule_seats")
+}
+
+
+model Booking {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_no     String        @unique @db.VarChar(30)
+  schedule_id    String        @db.Uuid
+  bus_id         String        @db.Uuid
+  user_id        String        @db.Uuid
+  total_cost     Decimal       @db.Decimal(10, 2)
+  status         BookingStatus @default(CONFIRMED)
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+
+  schedule       Schedule      @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
+  bus            Bus           @relation(fields: [bus_id], references: [id])
+  user           User          @relation(fields: [user_id], references: [id])
+  passengers     BookingPassenger[]
+  payments       Payment[]
+
+  @@map("bookings")
+}
+
+model BookingPassenger {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_id   String    @db.Uuid
+  passenger_id String    @db.Uuid
+  seat_id      String    @db.Uuid
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  booking      Booking   @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+  passenger    Passenger @relation(fields: [passenger_id], references: [id])
+  seat         ScheduleSeat @relation(fields: [seat_id], references: [id], onDelete: Cascade)
+
+  @@map("booking_passengers")
+}
+
+model Payment {
+  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booking_id          String        @db.Uuid
+  razorpay_order_id   String?
+  razorpay_payment_id String?
+  method              PaymentMethod
+  amount              Decimal       @db.Decimal(10, 2)
+  status              PaymentStatus @default(PENDING)
+  created_at          DateTime      @default(now())
+  updated_at          DateTime      @updatedAt
+
+  booking             Booking       @relation(fields: [booking_id], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
