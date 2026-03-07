@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
                         <Bus className="h-8 w-8 text-primary" />
                     </div>
                     <CardTitle className="text-2xl">Admin Terminal</CardTitle>
-                    <CardDescription>Sriram Bus Operations Management</CardDescription>
+                    <CardDescription>VSR Travels Operations Management</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleLogin} className="space-y-4">

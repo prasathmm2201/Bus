@@ -97,3 +97,12 @@ export async function logoutAction() {
     (await cookies()).delete("auth-token");
     return { success: true };
 }
+
+export async function getSavedPassengersAction(userId: string) {
+    try {
+        const passengers = await userService.getSavedPassengers(userId);
+        return { success: true, data: passengers };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}

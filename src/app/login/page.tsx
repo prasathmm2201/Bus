@@ -69,21 +69,28 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
-            const res = await verifyOtpAction(mobileNo, otpCode);
-            if (res.success && res.data) {
+            const res = await fetch("/api/auth/otp/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mobile_no: mobileNo, code: otpCode }),
+            });
+            const result = await res.json();
+
+            if (result.success && result.data) {
                 setAuth(
                     {
-                        id: res.data.id,
-                        name: res.data.name || "User",
-                        email: res.data.email || "",
-                        role: res.data.role
+                        id: result.data.id,
+                        name: result.data.name || "User",
+                        email: result.data.email || "",
+                        role: result.data.role,
+                        mobile_no: mobileNo
                     },
-                    res.token || ""
+                    result.token || ""
                 );
                 toast.success("Successfully logged in!");
                 router.push("/");
             } else {
-                toast.error(res.error || "Invalid OTP");
+                toast.error(result.error || "Invalid OTP");
             }
         } catch (error: any) {
             toast.error("An error occurred during verification");

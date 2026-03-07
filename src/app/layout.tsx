@@ -10,8 +10,11 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Sriram Bus | Premium Bus Booking Platform",
-  description: "Book your bus tickets with ease on Sriram Bus - RedBus like experience with modern touch.",
+  title: "VSR Travels | Premium Bus Booking Platform",
+  description: "Book your bus tickets with ease on VSR Travels - RedBus like experience with modern touch.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

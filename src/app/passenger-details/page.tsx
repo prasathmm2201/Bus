@@ -8,30 +8,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useState, useEffect } from "react";
-import AuthDialog from "@/modules/auth/AuthDialog";
+import { useState, useEffect, Suspense } from "react";
 import { getScheduleDetailsAction } from "@/app/actions/busActions";
 import { createBookingAction } from "@/app/actions/bookingActions";
 import { toast } from "sonner";
+import AuthGuard from "@/components/auth/AuthGuard";
 
-export default function PassengerDetailsPage() {
+function PassengerDetailsContent() {
     const { user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const scheduleId = searchParams.get("scheduleId");
     const seatIds = searchParams.get("selectedSeats")?.split(",") || [];
 
-    const [isAuthOpen, setIsAuthOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [schedule, setSchedule] = useState<any>(null);
     const [passengers, setPassengers] = useState<any[]>([]);
-
-    useEffect(() => {
-        if (!user) {
-            setIsAuthOpen(true);
-        }
-    }, [user]);
 
     useEffect(() => {
         if (!scheduleId || seatIds.length === 0) return;
@@ -53,7 +46,7 @@ export default function PassengerDetailsPage() {
             setLoading(false);
         };
         fetchDetails();
-    }, [scheduleId]);
+    }, [scheduleId, seatIds]);
 
     const handlePassengerChange = (index: number, field: string, value: any) => {
         const newPassengers = [...passengers];
@@ -77,7 +70,6 @@ export default function PassengerDetailsPage() {
                 userId: user.id,
                 scheduleId: schedule.id,
                 busId: schedule.bus_id,
-                totalCost: passengers.length * Number(schedule.price),
                 passengers: passengers.map(p => ({
                     name: p.name,
                     age: parseInt(p.age),
@@ -101,105 +93,106 @@ export default function PassengerDetailsPage() {
     };
 
     if (loading) return <div>Loading...</div>;
-    if (!user && !isAuthOpen) return null;
 
     return (
-        <LayoutWrapper>
-            <div className="container mx-auto px-4 py-12">
-                <AuthDialog
-                    isOpen={isAuthOpen}
-                    onClose={() => {
-                        if (!user) router.push("/");
-                        else setIsAuthOpen(false);
-                    }}
-                    onSuccess={() => setIsAuthOpen(false)}
-                />
+        <AuthGuard>
+            <LayoutWrapper>
+                <div className="container mx-auto px-4 py-12">
 
-                <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-                    <div className="md:col-span-2 space-y-6">
-                        <h1 className="text-2xl font-bold">Passenger Details</h1>
+                    <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+                        <div className="md:col-span-2 space-y-6">
+                            <h1 className="text-2xl font-bold">Passenger Details</h1>
 
-                        {passengers.map((p, idx) => (
-                            <Card key={p.seatId}>
+                            {passengers.map((p, idx) => (
+                                <Card key={p.seatId}>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">Seat {p.seatNumber} ({p.deck} Deck)</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Full Name</Label>
+                                                <Input
+                                                    placeholder="Enter passenger name"
+                                                    value={p.name}
+                                                    onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Age</Label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Enter age"
+                                                    value={p.age}
+                                                    onChange={(e) => handlePassengerChange(idx, "age", e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Gender</Label>
+                                            <RadioGroup
+                                                value={p.gender}
+                                                onValueChange={(val) => handlePassengerChange(idx, "gender", val)}
+                                                className="flex gap-4"
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="male" id={`male-${idx}`} />
+                                                    <Label htmlFor={`male-${idx}`}>Male</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="female" id={`female-${idx}`} />
+                                                    <Label htmlFor={`female-${idx}`}>Female</Label>
+                                                </div>
+                                            </RadioGroup>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+
+                            <div className="flex justify-end">
+                                <Button
+                                    size="lg"
+                                    className="w-full md:w-auto px-12"
+                                    onClick={handleBooking}
+                                    disabled={submitting}
+                                >
+                                    {submitting ? "Processing..." : "Confirm Booking"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <aside className="space-y-6">
+                            <Card className="bg-muted/30">
                                 <CardHeader>
-                                    <CardTitle className="text-lg">Seat {p.seatNumber} ({p.deck} Deck)</CardTitle>
+                                    <CardTitle>Booking Summary</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Full Name</Label>
-                                            <Input
-                                                placeholder="Enter passenger name"
-                                                value={p.name}
-                                                onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Age</Label>
-                                            <Input
-                                                type="number"
-                                                placeholder="Enter age"
-                                                value={p.age}
-                                                onChange={(e) => handlePassengerChange(idx, "age", e.target.value)}
-                                            />
-                                        </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm">Seats ({passengers.length})</span>
+                                        <span className="font-bold">{passengers.map(p => p.seatNumber).join(", ")}</span>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Gender</Label>
-                                        <RadioGroup
-                                            value={p.gender}
-                                            onValueChange={(val) => handlePassengerChange(idx, "gender", val)}
-                                            className="flex gap-4"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="male" id={`male-${idx}`} />
-                                                <Label htmlFor={`male-${idx}`}>Male</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="female" id={`female-${idx}`} />
-                                                <Label htmlFor={`female-${idx}`}>Female</Label>
-                                            </div>
-                                        </RadioGroup>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm">Base Fare</span>
+                                        <span className="font-bold">₹{passengers.length * (schedule?.price || 0)}</span>
+                                    </div>
+                                    <div className="border-t pt-4 flex justify-between items-center text-lg font-bold">
+                                        <span>Total amount</span>
+                                        <span className="text-primary">₹{passengers.length * (schedule?.price || 0)}</span>
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
-
-                        <div className="flex justify-end">
-                            <Button
-                                size="lg"
-                                className="w-full md:w-auto px-12"
-                                onClick={handleBooking}
-                                disabled={submitting}
-                            >
-                                {submitting ? "Processing..." : "Confirm Booking"}
-                            </Button>
-                        </div>
+                        </aside>
                     </div>
-
-                    <aside className="space-y-6">
-                        <Card className="bg-muted/30">
-                            <CardHeader>
-                                <CardTitle>Booking Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex justify-between">
-                                    <span className="text-sm">Seats ({passengers.length})</span>
-                                    <span className="font-bold">{passengers.map(p => p.seatNumber).join(", ")}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-sm">Base Fare</span>
-                                    <span className="font-bold">₹{passengers.length * (schedule?.price || 0)}</span>
-                                </div>
-                                <div className="border-t pt-4 flex justify-between items-center text-lg font-bold">
-                                    <span>Total amount</span>
-                                    <span className="text-primary">₹{passengers.length * (schedule?.price || 0)}</span>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </aside>
                 </div>
-            </div>
-        </LayoutWrapper>
+            </LayoutWrapper>
+        </AuthGuard>
+    );
+}
+
+export default function PassengerDetailsPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <PassengerDetailsContent />
+        </Suspense>
     );
 }

@@ -60,25 +60,25 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 1rem;
   --background: #FFFFFF;
   --foreground: #222323;
   --card: #FFFFFF;
   --card-foreground: #222323;
   --popover: #FFFFFF;
   --popover-foreground: #222323;
-  --primary: #3377D7;
+  --primary: #0D9488;
   --primary-foreground: #FFFFFF;
-  --secondary: #60A4DD;
+  --secondary: #14B8A6;
   --secondary-foreground: #FFFFFF;
-  --muted: #EAE8E6;
+  --muted: #F0FDFA;
   --muted-foreground: #666666;
-  --accent: #EAE8E6;
-  --accent-foreground: #3377D7;
+  --accent: #F0FDFA;
+  --accent-foreground: #0D9488;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #EAE8E6;
-  --input: #EAE8E6;
-  --ring: #3377D7;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #0D9488;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -132,6 +132,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -141,6 +142,7 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

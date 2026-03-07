@@ -61,7 +61,8 @@ export default function AdminDashboard() {
 
     // Helper to get initials
     const getInitials = (name: string) => {
-        return name.split(" ").map(n => n[0]).join("").toUpperCase();
+        console.log(name);
+        return name ? name.split(" ").map(n => n[0]).join("").toUpperCase() : "";
     };
 
     return (
@@ -116,7 +117,7 @@ export default function AdminDashboard() {
                                             <div>
                                                 <p className="font-bold">Booking #{booking.booking_no.slice(-8).toUpperCase()}</p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {booking.schedule.route.from_city} → {booking.schedule.route.to_city} • {booking.passengers.length} {booking.passengers.length === 1 ? 'Seat' : 'Seats'}
+                                                    {booking.schedule.route.from_city.name} → {booking.schedule.route.to_city.name} • {booking.passengers.length} {booking.passengers.length === 1 ? 'Seat' : 'Seats'}
                                                 </p>
                                             </div>
                                         </div>

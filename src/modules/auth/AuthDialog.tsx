@@ -66,22 +66,28 @@ export default function AuthDialog({ isOpen, onClose, onSuccess }: AuthDialogPro
 
         setLoading(true);
         try {
-            const res = await verifyOtpAction(mobileNo, otpCode);
-            if (res.success && res.data) {
-                setAuth(
-                    {
-                        id: res.data.id,
-                        name: res.data.name || "User",
-                        email: res.data.email || "",
-                        role: res.data.role
-                    },
-                    res.token || "token-placeholder"
-                );
+            const res = await fetch("/api/auth/otp/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mobile_no: mobileNo, code: otpCode }),
+            });
+            const result = await res.json();
+
+            if (result.success && result.data) {
+                console.log("OTP Verification Success", result.data);
+                const userToSave = {
+                    id: result.data.id,
+                    name: result.data.name || "User",
+                    email: result.data.email || "",
+                    mobile_no: result.data.mobile_no || mobileNo,
+                    role: result.data.role
+                };
+                setAuth(userToSave, result.token || "token-placeholder");
                 toast.success("Logged in successfully!");
                 onSuccess?.();
                 onClose();
             } else {
-                toast.error(res.error || "Invalid OTP");
+                toast.error(result.error || "Invalid OTP");
             }
         } catch (error) {
             toast.error("An error occurred during verification");
@@ -101,7 +107,7 @@ export default function AuthDialog({ isOpen, onClose, onSuccess }: AuthDialogPro
                 <div className="bg-primary p-8 text-white relative overflow-hidden">
                     <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
                     <div className="relative z-10">
-                        <DialogTitle className="text-2xl font-bold mb-2">Unlock the best of Sriram Bus</DialogTitle>
+                        <DialogTitle className="text-2xl font-bold mb-2">Unlock the best of VSR Travels</DialogTitle>
                         <DialogDescription className="text-white/80">
                             Join us to manage your bookings and get exclusive offers.
                         </DialogDescription>

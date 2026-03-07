@@ -2,6 +2,9 @@
 
 import { adminService } from "@/services/adminService";
 import { revalidatePath } from "next/cache";
+import prisma from "@/lib/prisma";
+import { cookies } from "next/headers";
+import { verifyJWT } from "@/lib/jwt";
 import { BusType, SeatLayout, SeatType, Deck } from "@prisma/client";
 import { serialize } from "@/lib/serialize";
 import { uploadToS3, deleteFromS3 } from "@/lib/s3";
@@ -53,8 +56,7 @@ export async function createScheduleAction(data: {
             endDate: new Date(data.endDate)
         });
         revalidatePath("/admin/schedules");
-        revalidatePath("/search");
-        return { success: true, data: schedules };
+        return { success: true, data: serialize(schedules) };
     } catch (error: any) {
         return { success: false, error: error.message };
     }
@@ -292,6 +294,136 @@ export async function deleteBoardingPointAction(id: string) {
         await adminService.deleteBoardingPoint(id);
         revalidatePath("/admin/boarding-points");
         return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+// Coupon Actions
+export async function createCouponAction(data: {
+    user_id: string;
+    description?: string;
+    discount_type: "FLAT" | "PERCENTAGE";
+    discount_value: number;
+    min_order_value?: number;
+    max_discount?: number;
+    expiry_days: number;
+    usage_limit?: number;
+}) {
+    try {
+        const { generateSmartCouponCode } = await import("@/lib/coupon-generator");
+
+        // Generate coupon code
+        const code = await generateSmartCouponCode(data.discount_type, data.discount_value);
+
+        // Get admin user ID from session
+        const cookieStore = await cookies();
+        const token = cookieStore.get("auth-token")?.value;
+        const payload = token ? await verifyJWT(token) : null;
+
+        console.log("Coupon Creation - Session Payload:", payload);
+
+        if (!payload || payload.role !== "ADMIN") {
+            return { success: false, error: "Unauthorized: Admin session not found" };
+        }
+
+        const created_by = payload.id as string;
+
+        if (!created_by) {
+            return { success: false, error: "Invalid admin session: Missing user ID" };
+        }
+
+        // Verify admin exists in DB to prevent foreign key error
+        const adminUser = await (prisma as any).user.findUnique({
+            where: { id: created_by }
+        });
+
+        if (!adminUser) {
+            console.error("CRITICAL: CURRENT SESSION ADMIN ID NOT FOUND IN DB:", created_by);
+            // List some users to help debug
+            const someUsers = await (prisma as any).user.findMany({ take: 5, select: { id: true, email: true, role: true } });
+            console.log("Current Users in DB (Sample):", someUsers);
+
+            return { success: false, error: `Unauthorized: Admin user not found in database (ID: ${created_by}). Please logout and login again.` };
+        }
+
+        console.log("Creating coupon for user:", data.user_id, "by admin:", adminUser.email);
+
+        // Verify recipient exists too
+        const recipient = await (prisma as any).user.findUnique({
+            where: { id: data.user_id }
+        });
+
+        if (!recipient) {
+            console.error("RECIPIENT USER NOT FOUND IN DB:", data.user_id);
+            return { success: false, error: `Recipient user not found in database (ID: ${data.user_id})` };
+        }
+
+        const coupon = await adminService.createCoupon({
+            ...data,
+            code,
+            created_by
+        });
+
+        revalidatePath("/admin/coupons");
+        return { success: true, data: serialize(coupon) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getCouponsAction(params?: {
+    search?: string;
+    user_id?: string;
+    status?: "active" | "inactive" | "expired" | "all";
+    limit?: number;
+    offset?: number;
+}) {
+    try {
+        const result = await adminService.getCoupons(params);
+        return { success: true, data: serialize(result) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function updateCouponAction(id: string, data: {
+    description?: string;
+    expiry_days?: number;
+    is_active?: boolean;
+}) {
+    try {
+        const coupon = await adminService.updateCoupon(id, data);
+        revalidatePath("/admin/coupons");
+        return { success: true, data: serialize(coupon) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function deactivateCouponAction(id: string) {
+    try {
+        const coupon = await adminService.deactivateCoupon(id);
+        revalidatePath("/admin/coupons");
+        return { success: true, data: serialize(coupon) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getCouponStatsAction(id: string) {
+    try {
+        const stats = await adminService.getCouponStats(id);
+        return { success: true, data: serialize(stats) };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function getUsersForCouponAction() {
+    try {
+        const users = await adminService.getUsersForCoupon();
+        return { success: true, data: serialize(users) };
     } catch (error: any) {
         return { success: false, error: error.message };
     }

@@ -9,7 +9,7 @@ export default function Footer() {
                     <div className="flex flex-col space-y-4">
                         <Link href="/" className="flex items-center space-x-2">
                             <Bus className="h-6 w-6 text-primary" />
-                            <span className="text-lg font-bold">Sriram Bus</span>
+                            <span className="text-lg font-bold">VSR Travels</span>
                         </Link>
                         <p className="text-sm text-muted-foreground">
                             Experience the best bus booking service in India. Premium, fast, and reliable.
@@ -47,7 +47,7 @@ export default function Footer() {
                 </div>
 
                 <div className="mt-12 border-t pt-8 text-center text-sm text-muted-foreground">
-                    <p>© {new Date().getFullYear()} Sriram Bus. All rights reserved.</p>
+                    <p>© {new Date().getFullYear()} VSR Travels. All rights reserved.</p>
                 </div>
             </div>
         </footer>

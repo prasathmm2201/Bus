@@ -16,10 +16,10 @@ export async function middleware(request: NextRequest) {
     }
 
     // Protected routes for users
-    const userProtectedRoutes = ["/passenger-details", "/my-bookings"];
+    const userProtectedRoutes = ["/search", "/bus", "/my-bookings", "/passenger-details", "/booking/confirmation"];
     if (userProtectedRoutes.some(route => pathname.startsWith(route))) {
         if (!payload) {
-            return NextResponse.redirect(new URL("/login", request.url));
+            return NextResponse.redirect(new URL("/", request.url));
         }
     }
 

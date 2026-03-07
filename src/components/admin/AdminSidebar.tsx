@@ -13,7 +13,8 @@ import {
     MapPinned,
     MapPin,
     Building2,
-    Route
+    Route,
+    Ticket
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,8 @@ const navItems = [
     { name: "Dropping Points", href: "/admin/dropping-points", icon: MapPin },
     { name: "Manage Buses", href: "/admin/buses", icon: Bus },
     { name: "Routes", href: "/admin/routes", icon: Navigation },
-    { name: "Schedules", href: "/admin/schedules", icon: CalendarClock }
+    { name: "Schedules", href: "/admin/schedules", icon: CalendarClock },
+    { name: "Coupons", href: "/admin/coupons", icon: Ticket }
 ];
 
 export default function AdminSidebar() {

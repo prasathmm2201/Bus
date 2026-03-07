@@ -25,49 +25,64 @@ const SleeperIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+const SteeringWheelIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={cn("w-full h-full text-current", className)} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="2" />
+        <path d="M12 14l0 8" />
+        <path d="M12 2l0 2" />
+        <path d="M12 14l-6.3 -4.6" />
+        <path d="M12 14l6.3 -4.6" />
+    </svg>
+);
+
 interface Seat {
     id: string;
     number: string;
-    status: "available" | "booked";
+    status: "available" | "booked" | "locked";
     gender_lock: "male" | "female" | null;
     type: "SEATER" | "SLEEPER";
     deck: "LOWER" | "UPPER";
     row: number;
     col: number;
+    price?: number | string;
 }
 
 interface SeatMapProps {
     seats: Seat[];
     price: number;
-    onSelect: (selectedSeats: Seat[]) => void;
+    selectedSeats: Seat[];
+    onSeatClick: (seat: Seat) => void;
+    filterPrice?: number | "all";
 }
 
-export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
-    const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
+export default function SeatMap({ seats, price, selectedSeats, onSeatClick, filterPrice = "all" }: SeatMapProps) {
     const [activeDeck, setActiveDeck] = useState<"LOWER" | "UPPER">("LOWER");
 
     const handleSeatClick = (seat: Seat) => {
-        if (seat.status === "booked") return;
-
-        const isSelected = selectedSeats.find((s) => s.id === seat.id);
-        let newSelection = [];
-
-        if (isSelected) {
-            newSelection = selectedSeats.filter((s) => s.id !== seat.id);
-        } else {
-            if (selectedSeats.length >= 6) return; // Limit 6 seats
-            newSelection = [...selectedSeats, seat];
-        }
-
-        setSelectedSeats(newSelection);
-        onSelect(newSelection);
+        onSeatClick(seat);
     };
 
     const getSeatColor = (seat: Seat) => {
+        const seatPrice = Number(seat.price || price);
+        const isFilteredOut = filterPrice !== "all" && seatPrice !== filterPrice;
+
+        if (isFilteredOut) return "bg-gray-100 text-gray-300 border-gray-100 opacity-30 cursor-not-allowed";
+
         if (selectedSeats.find((s) => s.id === seat.id)) return "bg-blue-600 text-white border-blue-700 shadow-lg scale-105 z-20";
-        if (seat.status === "booked") return "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50";
-        if (seat.gender_lock === "female") return "bg-rose-50 text-rose-600 border-rose-200";
-        if (seat.gender_lock === "male") return "bg-blue-50 text-blue-600 border-blue-200";
+
+        if (seat.status === "booked") {
+            if (seat.gender_lock === "female") return "bg-rose-100 text-rose-300 border-rose-200 cursor-not-allowed opacity-80";
+            if (seat.gender_lock === "male") return "bg-blue-100 text-blue-300 border-blue-200 cursor-not-allowed opacity-80";
+            return "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-80";
+        }
+
+        if (seat.status === "locked") return "bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed opacity-50";
+
+        // Gender specific styles for available seats
+        if (seat.gender_lock === "female") return "bg-rose-50 text-rose-600 border-rose-300 ring-1 ring-rose-200 hover:bg-rose-100";
+        if (seat.gender_lock === "male") return "bg-blue-50 text-blue-600 border-blue-300 ring-1 ring-blue-200 hover:bg-blue-100";
+
         return "bg-gray-100/50 text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-white hover:text-blue-600";
     };
 
@@ -83,46 +98,93 @@ export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
         const renderColumn = (colIndex: number) => {
             const colSeats = deckSeats.filter(s => s.col === colIndex).sort((a, b) => a.row - b.row);
             return (
-                <div key={colIndex} className="flex flex-col gap-2 min-w-[60px]">
-                    {colSeats.map((seat) => (
-                        <button
-                            key={seat.id}
-                            onClick={() => handleSeatClick(seat)}
-                            style={{
-                                height: "60px",
-                                width: "60px",
-                            }}
-                            className={cn(
-                                "relative flex flex-col items-center justify-center border-2 transition-all p-1 shadow-sm",
-                                "rounded-[6px]",
-                                getSeatColor(seat)
-                            )}
-                        >
-                            <div className={cn("opacity-80 transition-transform", "h-7 w-7")}>
-                                {seat.type?.toUpperCase() === "SEATER" ? <SeaterIcon /> : <SleeperIcon />}
-                            </div>
-                            <span className="text-[11px] font-black z-10 mt-1 uppercase tracking-tighter">{seat.number}</span>
-                            {seat.status === "booked" && (
-                                <div className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center rounded-full bg-slate-400 border border-white shadow-sm">
-                                    <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                <div key={colIndex} className="flex flex-col gap-2 min-w-[60px] py-4 h-full justify-between flex-1">
+                    {colSeats.map((seat) => {
+                        const seatPrice = Number(seat.price || price);
+                        const isFilteredOut = filterPrice !== "all" && seatPrice !== filterPrice;
+
+                        // Check adjacency for badge
+                        const isAisleBetween = (c1: number, c2: number) => {
+                            const min = Math.min(c1, c2);
+                            const max = Math.max(c1, c2);
+                            return min < 2 && max >= 2;
+                        };
+                        const adjFemale = seats.find(s => {
+                            if (s.id === seat.id) return false;
+                            if (s.deck !== seat.deck || s.row !== seat.row) return false;
+                            const isAdj = Math.abs(s.col - seat.col) === 1;
+                            if (!isAdj || isAisleBetween(s.col, seat.col)) return false;
+                            return (s.gender_lock as string) === "female" || (s.status === "booked" && (s.gender_lock as string) === "female");
+                        });
+
+                        const isFemaleOnly = seat.gender_lock === "female" || !!adjFemale;
+
+                        return (
+                            <button
+                                key={seat.id}
+                                onClick={() => handleSeatClick(seat)}
+                                style={{
+                                    width: "60px",
+                                }}
+                                className={cn(
+                                    "relative flex flex-col items-center justify-center border-2 transition-all p-1 shadow-sm flex-1",
+                                    "rounded-[6px]",
+                                    getSeatColor(seat)
+                                )}
+                            >
+                                <div className={cn("opacity-80 transition-transform", "h-7 w-7")}>
+                                    {seat.type?.toUpperCase() === "SEATER" ? <SeaterIcon /> : <SleeperIcon />}
                                 </div>
-                            )}
-                        </button>
-                    ))}
+                                <span className="text-[11px] font-black z-10 mt-1 uppercase tracking-tighter">{seat.number}</span>
+                                {isFemaleOnly && (
+                                    <div className={cn(
+                                        "absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center rounded-full border border-white shadow-sm ring-2",
+                                        seat.status === "available" ? "bg-rose-500 ring-rose-100" : "bg-rose-300 ring-rose-50"
+                                    )}>
+                                        <div className="text-[8px] font-bold text-white leading-none">F</div>
+                                    </div>
+                                )}
+                                {seat.gender_lock === "male" && (
+                                    <div className={cn(
+                                        "absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center rounded-full border border-white shadow-sm ring-2",
+                                        seat.status === "available" ? "bg-blue-500 ring-blue-100" : "bg-blue-300 ring-blue-50"
+                                    )}>
+                                        <div className="text-[8px] font-bold text-white leading-none">M</div>
+                                    </div>
+                                )}
+                                {!isFilteredOut && filterPrice === "all" && ( // Show price if not filtered out and viewing all, or maybe always? User said "show price of each seats"
+                                    <div className="text-[8px] font-medium opacity-60">₹{seat.price || price}</div>
+                                )}
+                                {seat.status === "booked" && !isFemaleOnly && (
+                                    <div className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center rounded-full bg-slate-400 border border-white shadow-sm">
+                                        <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                                    </div>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             )
         };
 
         return (
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center flex-1 h-full">
                 <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/50 mb-6">{label}</h4>
-                <div className="relative border border-muted/30 rounded-[32px] p-10 bg-white/50 shadow-2xl backdrop-blur-sm">
-                    <div className="absolute right-8 top-8 opacity-[0.03] pointer-events-none scale-150"><BusIcon className="w-12 h-12" /></div>
-
-                    <div className="flex gap-12 items-start">
+                <div className="relative border border-muted/30 rounded-[32px] p-10 bg-white/50 shadow-2xl backdrop-blur-sm flex-1 h-full flex flex-col justify-center">
+                    {label === "Lower Deck" && (
+                        <div className="flex justify-end pr-4 pb-4">
+                            <div className="w-8 h-8 text-gray-400 opacity-60">
+                                <SteeringWheelIcon />
+                            </div>
+                        </div>
+                    )}
+                    <div className="flex gap-12 h-full w-full justify-between">
                         {/* Left Section */}
-                        <div className="flex gap-2">
-                            {leftCols.map(renderColumn)}
+                        <div className="flex flex-col h-full flex-1">
+
+                            <div className="flex gap-2 h-full flex-1 justify-center">
+                                {leftCols.map(renderColumn)}
+                            </div>
                         </div>
 
                         {/* Aisle Area (Implicit) */}
@@ -132,7 +194,7 @@ export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
                         </div>
 
                         {/* Right Section */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 h-full flex-1 justify-center">
                             {rightCols.map(renderColumn)}
                         </div>
                     </div>
@@ -142,7 +204,7 @@ export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
     };
 
     return (
-        <div className="flex flex-col gap-8 lg:flex-row">
+        <div className="flex flex-col gap-8 lg:flex-row overflow-auto">
             <Card className="flex-1 p-6 bg-muted/20 overflow-hidden">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-8 border-b pb-4 gap-4">
                     <h3 className="font-bold flex items-center gap-2">
@@ -160,7 +222,7 @@ export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
                     </div>
                 </div>
 
-                <div className="overflow-auto scrollbar-hide flex justify-center py-4">
+                <div className="overflow-auto scrollbar-hide flex justify-start">
                     <div className="flex gap-12 min-w-fit px-8">
                         {renderDeck(lowerSeats, "Lower Deck")}
                         {upperSeats.length > 0 && (
@@ -172,85 +234,6 @@ export default function SeatMap({ seats, price, onSelect }: SeatMapProps) {
                     </div>
                 </div>
             </Card>
-
-            <div className="w-full lg:w-80 flex flex-col gap-4">
-                <Card>
-                    <CardContent className="p-4">
-                        <h4 className="font-bold mb-4 flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            Boarding & Dropping
-                        </h4>
-                        <div className="space-y-4">
-                            <div className="flex gap-4">
-                                <div className="flex flex-col items-center gap-1 py-1">
-                                    <div className="h-3 w-3 rounded-full border-2 border-primary bg-white"></div>
-                                    <div className="w-0.5 flex-1 bg-border border-dashed"></div>
-                                    <div className="h-3 w-3 rounded-full bg-primary"></div>
-                                </div>
-                                <div className="flex flex-col justify-between py-1 min-h-[100px]">
-                                    <div>
-                                        <p className="text-sm font-bold">21:00 - Bangalore</p>
-                                        <p className="text-xs text-muted-foreground">Majestic Bus Stand</p>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground py-2 italic">8h 30m duration</div>
-                                    <div>
-                                        <p className="text-sm font-bold">05:30 - Hyderabad</p>
-                                        <p className="text-xs text-muted-foreground">Kukatpally Metro</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-primary/5 border-primary/20">
-                    <CardContent className="p-4">
-                        <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold">Summary</h4>
-                            <Badge variant="outline" className="text-[10px]">{selectedSeats.length} Seats</Badge>
-                        </div>
-                        {selectedSeats.length > 0 ? (
-                            <div className="space-y-4">
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedSeats.map((s) => (
-                                        <Badge key={s.id} variant="secondary" className="bg-blue-600 text-white border-blue-700 hover:bg-blue-700">
-                                            {s.number}
-                                        </Badge>
-                                    ))}
-                                </div>
-                                <div className="border-t pt-4 space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Base Fare</span>
-                                        <span>₹{selectedSeats.length * price}</span>
-                                    </div>
-                                    <div className="flex justify-between text-lg font-bold text-primary">
-                                        <span>Total</span>
-                                        <span>₹{selectedSeats.length * price}</span>
-                                    </div>
-                                </div>
-                                <Button className="w-full shadow-lg group" asChild>
-                                    <Link href={{
-                                        pathname: "/passenger-details",
-                                        query: {
-                                            scheduleId: seats[0]?.id ? seats.find(s => s.id)?.id : "", // This is not quite right, I need scheduleId
-                                            // Wait, the scheduleId should be passed down or available.
-                                            selectedSeats: selectedSeats.map(s => s.id).join(",")
-                                        }
-                                    }}>
-                                        Proceed to Booking
-                                        <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                                    </Link>
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="text-center py-6">
-                                <Armchair className="h-12 w-12 text-muted/30 mx-auto mb-2" />
-                                <p className="text-sm text-muted-foreground italic">Please select your seats to continue</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
         </div>
     );
 }

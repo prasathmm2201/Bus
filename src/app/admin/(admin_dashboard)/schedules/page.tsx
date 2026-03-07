@@ -301,6 +301,7 @@ export default function AdminSchedulesPage() {
                                     type="date"
                                     className="h-8 w-40 text-xs rounded-full"
                                     value={customDate}
+                                    min={format(new Date(), "yyyy-MM-dd")}
                                     onChange={(e) => {
                                         setCustomDate(e.target.value);
                                         if (e.target.value) setDateFilter("custom");
@@ -469,6 +470,7 @@ export default function AdminSchedulesPage() {
                                                         type="date"
                                                         className="h-12 rounded-xl pl-4"
                                                         value={formData.startDate}
+                                                        min={format(new Date(), "yyyy-MM-dd")}
                                                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                                                         required
                                                     />
@@ -479,6 +481,7 @@ export default function AdminSchedulesPage() {
                                                         type="date"
                                                         className="h-12 rounded-xl pl-4"
                                                         value={formData.endDate}
+                                                        min={formData.startDate || format(new Date(), "yyyy-MM-dd")}
                                                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                                                         required
                                                     />

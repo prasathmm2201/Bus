@@ -18,8 +18,25 @@ export async function getScheduleDetailsAction(id: string) {
         const schedule = await prisma.schedule.findUnique({
             where: { id },
             include: {
-                bus: true,
-                route: true,
+                bus: {
+                    include: {
+                        template_seats: true // Fetch template seats if needed for base price ref, though we use schedule seats mostly
+                    }
+                },
+                route: {
+                    include: {
+                        from_city: true,
+                        to_city: true,
+                        boarding_points: {
+                            include: { boarding_point: true },
+                            orderBy: { order: "asc" }
+                        },
+                        dropping_points: {
+                            include: { dropping_point: true },
+                            orderBy: { order: "asc" }
+                        }
+                    }
+                },
                 seats: {
                     orderBy: {
                         seat_number: "asc"

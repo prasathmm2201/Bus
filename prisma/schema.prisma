@@ -44,6 +44,7 @@ enum Deck {
 
 enum SeatStatus {
   available
+  locked
   booked
 }
 
@@ -79,8 +80,11 @@ model User {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   
-  passengers    Passenger[]
-  bookings      Booking[]
+  passengers       Passenger[]
+  bookings         Booking[]
+  coupon_usages    CouponUsage[]
+  user_coupons     Coupon[]      @relation("UserCoupons")
+  created_coupons  Coupon[]      @relation("CreatedCoupons")
 
   @@map("users")
 }
@@ -94,6 +98,54 @@ model Otp {
 
   @@index([mobile_no])
   @@map("otps")
+}
+
+model Coupon {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String        @unique @db.VarChar(20)
+  description     String?       @db.VarChar(255)
+  discount_type   DiscountType  @default(FLAT)
+  discount_value  Decimal       @db.Decimal(10, 2)
+  min_order_value Decimal       @default(0) @db.Decimal(10, 2)
+  max_discount    Decimal?      @db.Decimal(10, 2)
+  valid_from      DateTime      @default(now())
+  valid_until     DateTime?
+  usage_limit     Int?          // Global usage limit
+  user_limit      Int           @default(1) // Per user limit
+  user_id         String?       @db.Uuid // User-specific coupon (null = global coupon)
+  created_by      String?       @db.Uuid // Admin who created the coupon
+  is_active       Boolean       @default(true)
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+
+  user            User?         @relation("UserCoupons", fields: [user_id], references: [id])
+  creator         User?         @relation("CreatedCoupons", fields: [created_by], references: [id])
+  usages          CouponUsage[]
+  bookings        Booking[]
+
+  @@index([user_id])
+  @@index([is_active])
+  @@index([valid_until])
+  @@map("coupons")
+}
+
+model CouponUsage {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  coupon_id String   @db.Uuid
+  user_id   String   @db.Uuid
+  booking_id String  @db.Uuid
+  used_at   DateTime @default(now())
+
+  coupon    Coupon   @relation(fields: [coupon_id], references: [id])
+  user      User     @relation(fields: [user_id], references: [id])
+  booking   Booking  @relation(fields: [booking_id], references: [id])
+
+  @@map("coupon_usages")
+}
+
+enum DiscountType {
+  FLAT
+  PERCENTAGE
 }
 
 model Passenger {
@@ -279,6 +331,8 @@ model ScheduleSeat {
   row            Int        @default(0)
   col            Int        @default(0)
   price          Decimal    @db.Decimal(10, 2)
+  locked_at      DateTime?
+  lock_token     String?    @db.VarChar(100)
   created_at     DateTime   @default(now())
   updated_at     DateTime   @updatedAt
 
@@ -296,6 +350,9 @@ model Booking {
   bus_id         String        @db.Uuid
   user_id        String        @db.Uuid
   total_cost     Decimal       @db.Decimal(10, 2)
+  discount_amount Decimal      @default(0) @db.Decimal(10, 2)
+  final_amount   Decimal       @default(0) @db.Decimal(10, 2)
+  coupon_id      String?       @db.Uuid
   status         BookingStatus @default(CONFIRMED)
   created_at     DateTime      @default(now())
   updated_at     DateTime      @updatedAt
@@ -303,8 +360,10 @@ model Booking {
   schedule       Schedule      @relation(fields: [schedule_id], references: [id], onDelete: Cascade)
   bus            Bus           @relation(fields: [bus_id], references: [id])
   user           User          @relation(fields: [user_id], references: [id])
+  coupon         Coupon?       @relation(fields: [coupon_id], references: [id])
   passengers     BookingPassenger[]
   payments       Payment[]
+  coupon_usages   CouponUsage[]
 
   @@map("bookings")
 }

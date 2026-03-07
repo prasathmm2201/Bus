@@ -2,6 +2,22 @@ import prisma from "@/lib/prisma";
 import { SeatType, Deck, BusType, SeatLayout, Prisma } from "@prisma/client";
 import { deleteFromS3 } from "@/lib/s3";
 
+const parseTime12h = (timeStr: string) => {
+    const match = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
+    if (!match) {
+        // Fallback to 24h format if match fails
+        const [h, m] = timeStr.split(":").map(Number);
+        return [h || 0, m || 0];
+    }
+    let h = Number(match[1]);
+    const m = Number(match[2]);
+    const period = match[3].toUpperCase();
+
+    if (period === "PM" && h < 12) h += 12;
+    if (period === "AM" && h === 12) h = 0;
+    return [h, m];
+};
+
 /**
  * Service to handle Admin operations for Bus Management
  */
@@ -73,24 +89,8 @@ export const adminService = {
         if (!bus) throw new Error("Bus not found");
 
         const schedules = [];
-        const parseTime = (timeStr: string) => {
-            const match = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
-            if (!match) {
-                // Fallback to 24h format if match fails
-                const [h, m] = timeStr.split(":").map(Number);
-                return [h || 0, m || 0];
-            }
-            let h = Number(match[1]);
-            const m = Number(match[2]);
-            const period = match[3].toUpperCase();
-
-            if (period === "PM" && h < 12) h += 12;
-            if (period === "AM" && h === 12) h = 0;
-            return [h, m];
-        };
-
-        const [depH, depM] = parseTime(data.departureTime);
-        const [arrH, arrM] = parseTime(data.arrivalTime);
+        const [depH, depM] = parseTime12h(data.departureTime);
+        const [arrH, arrM] = parseTime12h(data.arrivalTime);
 
         for (let d = new Date(data.startDate); d <= data.endDate; d.setDate(d.getDate() + 1)) {
             const departure = new Date(d);
@@ -346,13 +346,16 @@ export const adminService = {
         if (!existing) throw new Error("Schedule not found");
 
         const departureDate = new Date(existing.departure_time);
-        const [dHours, dMinutes] = data.departureTime.split(":");
-        departureDate.setHours(parseInt(dHours), parseInt(dMinutes), 0, 0);
+        const [dHours, dMinutes] = parseTime12h(data.departureTime);
+        departureDate.setHours(dHours, dMinutes, 0, 0);
 
         const arrivalDate = new Date(departureDate);
-        const [aHours, aMinutes] = data.arrivalTime.split(":");
-        arrivalDate.setHours(parseInt(aHours), parseInt(aMinutes), 0, 0);
+        const [aHours, aMinutes] = parseTime12h(data.arrivalTime);
+        arrivalDate.setHours(aHours, aMinutes, 0, 0);
+
         if (data.isNextDay) {
+            arrivalDate.setDate(arrivalDate.getDate() + 1);
+        } else if (arrivalDate < departureDate) {
             arrivalDate.setDate(arrivalDate.getDate() + 1);
         }
 
@@ -788,6 +791,344 @@ export const adminService = {
 
         return await prisma.boardingPoint.delete({
             where: { id }
+        });
+    },
+
+    /**
+     * Coupon Management
+     */
+    async createCoupon(data: {
+        code: string;
+        user_id: string;
+        created_by: string;
+        description?: string;
+        discount_type: "FLAT" | "PERCENTAGE";
+        discount_value: number;
+        min_order_value?: number;
+        max_discount?: number;
+        expiry_days: number;
+        usage_limit?: number;
+    }) {
+        // Validate user exists and has USER role
+        const user = await prisma.user.findUnique({
+            where: { id: data.user_id }
+        });
+
+        if (!user) {
+            throw new Error("User not found");
+        }
+
+        if (user.role !== "USER") {
+            throw new Error("Coupons can only be created for users with USER role");
+        }
+
+        // Check if user already has an active coupon
+        const existingActiveCoupon = await prisma.coupon.findFirst({
+            where: {
+                user_id: data.user_id,
+                is_active: true,
+                valid_until: {
+                    gte: new Date()
+                }
+            }
+        });
+
+        if (existingActiveCoupon) {
+            throw new Error(`User already has an active coupon: ${existingActiveCoupon.code}`);
+        }
+
+        // Validate discount values
+        if (data.discount_type === "PERCENTAGE" && data.discount_value > 100) {
+            throw new Error("Percentage discount cannot exceed 100%");
+        }
+
+        if (data.discount_value <= 0) {
+            throw new Error("Discount value must be greater than 0");
+        }
+
+        if (data.expiry_days <= 0) {
+            throw new Error("Expiry days must be greater than 0");
+        }
+
+        // Calculate expiry date
+        const validUntil = new Date();
+        validUntil.setDate(validUntil.getDate() + data.expiry_days);
+        validUntil.setHours(23, 59, 59, 999); // End of day
+
+        // Create coupon
+        return await prisma.coupon.create({
+            data: {
+                code: data.code,
+                user_id: data.user_id,
+                created_by: data.created_by,
+                description: data.description,
+                discount_type: data.discount_type,
+                discount_value: data.discount_value,
+                min_order_value: data.min_order_value || 0,
+                max_discount: data.max_discount,
+                valid_until: validUntil,
+                usage_limit: data.usage_limit,
+                user_limit: 1, // User-specific coupons are single-use per user
+                is_active: true
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        mobile_no: true
+                    }
+                },
+                creator: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+    },
+
+    async getCoupons(params?: {
+        search?: string;
+        user_id?: string;
+        status?: "active" | "inactive" | "expired" | "all";
+        limit?: number;
+        offset?: number;
+    }) {
+        const where: any = {};
+
+        // Search by code
+        if (params?.search) {
+            where.code = {
+                contains: params.search.toUpperCase(),
+                mode: "insensitive"
+            };
+        }
+
+        // Filter by user
+        if (params?.user_id) {
+            where.user_id = params.user_id;
+        }
+
+        // Filter by status
+        if (params?.status && params.status !== "all") {
+            const now = new Date();
+
+            if (params.status === "active") {
+                where.is_active = true;
+                where.OR = [
+                    { valid_until: null },
+                    { valid_until: { gte: now } }
+                ];
+            } else if (params.status === "inactive") {
+                where.is_active = false;
+            } else if (params.status === "expired") {
+                where.valid_until = { lt: now };
+            }
+        }
+
+        const [coupons, total] = await Promise.all([
+            prisma.coupon.findMany({
+                where,
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            mobile_no: true
+                        }
+                    },
+                    creator: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true
+                        }
+                    },
+                    usages: true,
+                    _count: {
+                        select: {
+                            usages: true
+                        }
+                    }
+                },
+                orderBy: { created_at: "desc" },
+                take: params?.limit || 50,
+                skip: params?.offset || 0
+            }),
+            prisma.coupon.count({ where })
+        ]);
+
+        // Add computed fields
+        const now = new Date();
+        const enrichedCoupons = coupons.map(coupon => ({
+            ...coupon,
+            is_expired: coupon.valid_until ? coupon.valid_until < now : false,
+            usage_count: coupon._count.usages,
+            can_edit: coupon._count.usages === 0 // Can only edit if not used
+        }));
+
+        return {
+            coupons: enrichedCoupons,
+            total,
+            page: Math.floor((params?.offset || 0) / (params?.limit || 50)) + 1,
+            totalPages: Math.ceil(total / (params?.limit || 50))
+        };
+    },
+
+    async updateCoupon(id: string, data: {
+        description?: string;
+        expiry_days?: number;
+        is_active?: boolean;
+    }) {
+        const existing = await prisma.coupon.findUnique({
+            where: { id },
+            include: {
+                _count: {
+                    select: { usages: true }
+                }
+            }
+        });
+
+        if (!existing) {
+            throw new Error("Coupon not found");
+        }
+
+        // Prevent editing if coupon has been used
+        if (existing._count.usages > 0 && (data.expiry_days !== undefined)) {
+            throw new Error("Cannot modify expiry of a coupon that has already been used");
+        }
+
+        const updateData: any = {};
+
+        if (data.description !== undefined) {
+            updateData.description = data.description;
+        }
+
+        if (data.is_active !== undefined) {
+            updateData.is_active = data.is_active;
+        }
+
+        if (data.expiry_days !== undefined) {
+            if (data.expiry_days <= 0) {
+                throw new Error("Expiry days must be greater than 0");
+            }
+
+            const validUntil = new Date();
+            validUntil.setDate(validUntil.getDate() + data.expiry_days);
+            validUntil.setHours(23, 59, 59, 999);
+
+            updateData.valid_until = validUntil;
+        }
+
+        return await prisma.coupon.update({
+            where: { id },
+            data: updateData,
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        mobile_no: true
+                    }
+                },
+                creator: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+    },
+
+    async deactivateCoupon(id: string) {
+        const coupon = await prisma.coupon.findUnique({
+            where: { id }
+        });
+
+        if (!coupon) {
+            throw new Error("Coupon not found");
+        }
+
+        return await prisma.coupon.update({
+            where: { id },
+            data: { is_active: false },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+    },
+
+    async getCouponStats(id: string) {
+        const coupon = await prisma.coupon.findUnique({
+            where: { id },
+            include: {
+                usages: {
+                    include: {
+                        booking: {
+                            select: {
+                                booking_no: true,
+                                total_cost: true,
+                                discount_amount: true,
+                                created_at: true
+                            }
+                        }
+                    }
+                },
+                user: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        if (!coupon) {
+            throw new Error("Coupon not found");
+        }
+
+        const totalDiscount = coupon.usages.reduce(
+            (sum, usage) => sum + Number(usage.booking.discount_amount),
+            0
+        );
+
+        return {
+            coupon,
+            usage_count: coupon.usages.length,
+            total_discount: totalDiscount,
+            is_expired: coupon.valid_until ? coupon.valid_until < new Date() : false
+        };
+    },
+
+    async getUsersForCoupon() {
+        return await prisma.user.findMany({
+            where: {
+                role: "USER",
+                is_delete: false
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                mobile_no: true,
+                country_code: true
+            },
+            orderBy: { created_at: "desc" }
         });
     }
 };
