@@ -152,13 +152,12 @@ export default function SearchForm() {
                             </div>
                         </div>
 
-                        {/* Search Button */}
                         <Button
                             type="submit"
-                            onClick={handleSearch}
-                            className="h-8 lg:h-[50px] lg:w-30 bg-teal-600 hover:bg-teal-700 text-white font-black text-lg rounded-md lg:rounded-[0.5rem] shadow-xl shadow-teal-200 transition-all active:scale-95 flex items-center justify-center gap-3"
+                            className="h-10 lg:h-[50px] px-8 bg-teal-600 hover:bg-teal-700 text-white font-black text-lg rounded-xl shadow-xl shadow-teal-200 transition-all active:scale-95 flex items-center justify-center gap-3"
                         >
-                            <span>Search</span>
+                            <Search className="h-5 w-5" />
+                            <span className="hidden lg:block">Search</span>
                         </Button>
                     </form>
                 </CardContent>
