@@ -5,6 +5,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
     try {
+        if (process.env.NODE_ENV === "development") {
+            return NextResponse.json({
+                success: true,
+                message: "Cron disabled in development",
+                count: 0
+            });
+        }
         const result = await bookingService.cleanupExpiredLocks();
         return NextResponse.json({
             success: true,

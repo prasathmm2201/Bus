@@ -10,6 +10,7 @@ import { getCitiesAction } from "@/app/actions/adminActions";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import CustomDatePicker from "@/components/ui/CustomDatePicker";
+import { toast } from "sonner";
 
 export default function SearchForm() {
     const [from, setFrom] = useState("");
@@ -35,10 +36,28 @@ export default function SearchForm() {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!from) {
+            toast.error("Please select a departure city");
+            return;
+        }
+        if (!to) {
+            toast.error("Please select a destination city");
+            return;
+        }
+        if (from === to) {
+            toast.error("Departure and destination cannot be the same");
+            return;
+        }
+        if (!date) {
+            toast.error("Please select a date");
+            return;
+        }
+
         if (from && to && date) {
             localStorage.setItem("last_search_from", from);
             localStorage.setItem("last_search_to", to);
-            router.push(`/search?from=${from}&to=${to}&date=${date}`);
+            router.push(`/search?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${encodeURIComponent(date)}`);
         }
     };
 
@@ -69,7 +88,6 @@ export default function SearchForm() {
                                     className="w-full bg-transparent text-base font-bold text-slate-800 focus:outline-none appearance-none cursor-pointer"
                                     value={from}
                                     onChange={(e) => setFrom(e.target.value)}
-                                    required
                                 >
                                     <option value="">Departure City</option>
                                     {cities.map(city => (
@@ -106,7 +124,6 @@ export default function SearchForm() {
                                     className="w-full bg-transparent text-base font-bold text-slate-800 focus:outline-none appearance-none cursor-pointer"
                                     value={to}
                                     onChange={(e) => setTo(e.target.value)}
-                                    required
                                 >
                                     <option value="">Destination City</option>
                                     {cities.map(city => (
@@ -138,6 +155,7 @@ export default function SearchForm() {
                         {/* Search Button */}
                         <Button
                             type="submit"
+                            onClick={handleSearch}
                             className="h-8 lg:h-[50px] lg:w-30 bg-teal-600 hover:bg-teal-700 text-white font-black text-lg rounded-md lg:rounded-[0.5rem] shadow-xl shadow-teal-200 transition-all active:scale-95 flex items-center justify-center gap-3"
                         >
                             <span>Search</span>
