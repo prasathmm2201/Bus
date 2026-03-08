@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma";
 import { SeatType, Deck, BusType, SeatLayout, Prisma } from "@prisma/client";
 import { deleteFromS3 } from "@/lib/s3";
+import { setISTHours, getISTDayBounds } from "@/lib/utils";
 
 const parseTime12h = (timeStr: string) => {
     const match = timeStr.match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i);
@@ -93,11 +94,8 @@ export const adminService = {
         const [arrH, arrM] = parseTime12h(data.arrivalTime);
 
         for (let d = new Date(data.startDate); d <= data.endDate; d.setDate(d.getDate() + 1)) {
-            const departure = new Date(d);
-            departure.setHours(depH, depM, 0, 0);
-
-            const arrival = new Date(d);
-            arrival.setHours(arrH, arrM, 0, 0);
+            const departure = setISTHours(d, depH, depM);
+            const arrival = setISTHours(d, arrH, arrM);
 
             if (data.isNextDay) {
                 arrival.setDate(arrival.getDate() + 1);
@@ -345,13 +343,11 @@ export const adminService = {
 
         if (!existing) throw new Error("Schedule not found");
 
-        const departureDate = new Date(existing.departure_time);
         const [dHours, dMinutes] = parseTime12h(data.departureTime);
-        departureDate.setHours(dHours, dMinutes, 0, 0);
+        const departureDate = setISTHours(existing.departure_time, dHours, dMinutes);
 
-        const arrivalDate = new Date(departureDate);
         const [aHours, aMinutes] = parseTime12h(data.arrivalTime);
-        arrivalDate.setHours(aHours, aMinutes, 0, 0);
+        const arrivalDate = setISTHours(existing.departure_time, aHours, aMinutes);
 
         if (data.isNextDay) {
             arrivalDate.setDate(arrivalDate.getDate() + 1);
@@ -444,10 +440,7 @@ export const adminService = {
      * Get detailed schedule info for a specific date
      */
     async getSchedulesByDate(date: string) {
-        const startOfDay = new Date(date);
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date(date);
-        endOfDay.setHours(23, 59, 59, 999);
+        const { start: startOfDay, end: endOfDay } = getISTDayBounds(date);
 
         const schedules = await prisma.schedule.findMany({
             where: {
@@ -851,9 +844,8 @@ export const adminService = {
         }
 
         // Calculate expiry date
-        const validUntil = new Date();
+        const validUntil = setISTHours(new Date(), 23, 59, 59, 999);
         validUntil.setDate(validUntil.getDate() + data.expiry_days);
-        validUntil.setHours(23, 59, 59, 999); // End of day
 
         // Create coupon
         return await prisma.coupon.create({
@@ -1018,9 +1010,8 @@ export const adminService = {
                 throw new Error("Expiry days must be greater than 0");
             }
 
-            const validUntil = new Date();
+            const validUntil = setISTHours(new Date(), 23, 59, 59, 999);
             validUntil.setDate(validUntil.getDate() + data.expiry_days);
-            validUntil.setHours(23, 59, 59, 999);
 
             updateData.valid_until = validUntil;
         }

@@ -69,12 +69,7 @@ export default function LoginPage() {
 
         setLoading(true);
         try {
-            const res = await fetch("/api/auth/otp/verify", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ mobile_no: mobileNo, code: otpCode }),
-            });
-            const result = await res.json();
+            const result = await verifyOtpAction(mobileNo, otpCode);
 
             if (result.success && result.data) {
                 setAuth(
@@ -88,7 +83,8 @@ export default function LoginPage() {
                     result.token || ""
                 );
                 toast.success("Successfully logged in!");
-                router.push("/");
+                // Use hard redirect to ensure cookies and auth state are fresh
+                window.location.href = "/";
             } else {
                 toast.error(result.error || "Invalid OTP");
             }

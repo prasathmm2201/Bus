@@ -1,18 +1,17 @@
 import prisma from "@/lib/prisma";
+import { setISTHours, getISTDayBounds, isSameISTDay } from "@/lib/utils";
 
 export async function searchBuses(from: string, to: string, date: string) {
-    const travelDate = new Date(date);
-    travelDate.setHours(0, 0, 0, 0);
+    const bounds = getISTDayBounds(date);
 
     // To handle next-day arrival/pickup, we need to check schedules departing 
     // on the search date AND schedules departing on the previous day.
-    const prevDate = new Date(travelDate);
-    prevDate.setDate(prevDate.getDate() - 1);
+    // We expand the window to 48 hours in IST to be safe.
+    const prevDate = new Date(bounds.start.getTime() - (24 * 60 * 60 * 1000));
+    const prevBounds = getISTDayBounds(prevDate);
 
-    const searchStart = new Date(prevDate);
-    searchStart.setHours(0, 0, 0, 0);
-    const searchEnd = new Date(travelDate);
-    searchEnd.setHours(23, 59, 59, 999);
+    const searchStart = prevBounds.start;
+    const searchEnd = bounds.end;
 
     const schedules = await prisma.schedule.findMany({
         where: {
@@ -73,16 +72,10 @@ export async function searchBuses(from: string, to: string, date: string) {
         // "from" must be a valid pickup point
         if (!fromNode.is_pickup) return false;
 
-        // Check date match: schedule departure date + city next_day offset must equal travelDate
-        const scheduleDepDate = new Date(schedule.departure_time);
-        scheduleDepDate.setHours(0, 0, 0, 0);
+        // Check date match: actual pickup date must equal search date in IST
+        const actualPickupTime = new Date(new Date(schedule.departure_time).getTime() + (fromNode.is_next_day ? 24 * 60 * 60 * 1000 : 0));
 
-        const actualPickupDate = new Date(scheduleDepDate);
-        if (fromNode.is_next_day) {
-            actualPickupDate.setDate(actualPickupDate.getDate() + 1);
-        }
-
-        return actualPickupDate.getTime() === travelDate.getTime();
+        return isSameISTDay(actualPickupTime, date);
     });
 
     // Helper to parse time string "HH:MM AM/PM"
@@ -94,8 +87,7 @@ export async function searchBuses(from: string, to: string, date: string) {
         if (period?.toUpperCase() === "PM" && hours !== 12) hours += 12;
         if (period?.toUpperCase() === "AM" && hours === 12) hours = 0;
 
-        const newDate = new Date(date);
-        newDate.setHours(hours, minutes, 0, 0);
+        let newDate = setISTHours(date, hours, minutes);
         if (isNextDay) {
             newDate.setDate(newDate.getDate() + 1);
         }
@@ -122,17 +114,13 @@ export async function searchBuses(from: string, to: string, date: string) {
         // Calculate Departure Time
         let departureTime = new Date(schedule.departure_time);
         if (fromNode && fromNode.arrival_time) {
-            const baseDate = new Date(schedule.departure_time);
-            baseDate.setHours(0, 0, 0, 0);
-            departureTime = parseTime(baseDate, fromNode.arrival_time, fromNode.is_next_day);
+            departureTime = parseTime(schedule.departure_time, fromNode.arrival_time, fromNode.is_next_day);
         }
 
         // Calculate Arrival Time
         let arrivalTime = new Date(schedule.arrival_time);
         if (toNode && toNode.id !== route.to_city_id && toNode.arrival_time) {
-            const baseDate = new Date(schedule.departure_time);
-            baseDate.setHours(0, 0, 0, 0);
-            arrivalTime = parseTime(baseDate, toNode.arrival_time, toNode.is_next_day);
+            arrivalTime = parseTime(schedule.departure_time, toNode.arrival_time, toNode.is_next_day);
         }
 
         // Get Boarding Points

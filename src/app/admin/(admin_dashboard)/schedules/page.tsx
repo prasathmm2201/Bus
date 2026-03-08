@@ -101,21 +101,27 @@ export default function AdminSchedulesPage() {
     const getFilterData = (filter: string, custom: string) => {
         const today = new Date();
         if (filter === "today") {
-            const startStr = format(today, "yyyy-MM-dd") + "T00:00:00.000Z";
-            const endStr = format(today, "yyyy-MM-dd") + "T23:59:59.999Z";
-            return { startDate: startStr, endDate: endStr };
+            const start = new Date(today);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(today);
+            end.setHours(23, 59, 59, 999);
+            return { startDate: start.toISOString(), endDate: end.toISOString() };
         }
         if (filter === "tomorrow") {
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
-            const startStr = format(tomorrow, "yyyy-MM-dd") + "T00:00:00.000Z";
-            const endStr = format(tomorrow, "yyyy-MM-dd") + "T23:59:59.999Z";
-            return { startDate: startStr, endDate: endStr };
+            const start = new Date(tomorrow);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(tomorrow);
+            end.setHours(23, 59, 59, 999);
+            return { startDate: start.toISOString(), endDate: end.toISOString() };
         }
         if (filter === "custom" && custom) {
-            const startStr = custom + "T00:00:00.000Z";
-            const endStr = custom + "T23:59:59.999Z";
-            return { startDate: startStr, endDate: endStr };
+            const start = new Date(custom);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(custom);
+            end.setHours(23, 59, 59, 999);
+            return { startDate: start.toISOString(), endDate: end.toISOString() };
         }
         return {};
     };
@@ -132,6 +138,7 @@ export default function AdminSchedulesPage() {
             const res = await getSchedulesAction({
                 limit: 10,
                 offset: newOffset,
+                dateFilter: dateFilter, // Explicitly pass the filter key
                 ...filters
             });
 

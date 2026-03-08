@@ -108,7 +108,7 @@ export default function Navbar() {
                             animate={{ x: 0 }}
                             exit={{ x: "100%" }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className="fixed right-0 top-0 z-[101] h-full w-[280px] bg-white p-6 shadow-2xl md:hidden"
+                            className="fixed right-0 top-0 z-[101] h-screen w-[300px] bg-white p-8 shadow-2xl md:hidden overflow-y-auto"
                         >
                             <div className="flex flex-col h-full">
                                 <div className="flex items-center justify-between mb-8">
@@ -121,13 +121,13 @@ export default function Navbar() {
                                 </div>
 
                                 <div className="flex flex-col space-y-6">
-                                    <Link
+                                    {/* <Link
                                         href="/search"
                                         onClick={() => setIsMenuOpen(false)}
                                         className="text-lg font-semibold transition-colors hover:text-primary flex items-center gap-3"
                                     >
                                         <Bus className="h-5 w-5" /> Search Buses
-                                    </Link>
+                                    </Link> */}
                                     <Link
                                         href="/my-bookings"
                                         onClick={() => setIsMenuOpen(false)}

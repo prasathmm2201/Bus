@@ -49,6 +49,7 @@ export default function SearchScreen() {
 
     const [buses, setBuses] = useState<BusResult[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     // Filter States (Original)
     const [selectedBusTypes, setSelectedBusTypes] = useState<string[]>([]);
@@ -230,81 +231,17 @@ export default function SearchScreen() {
                                     </Button>
                                 </div>
                                 <CardContent className="p-6 space-y-8 bg-white">
-                                    {/* Bus Type */}
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Bus Type</label>
-                                        <div className="space-y-3">
-                                            {["AC", "Non-AC", "Sleeper", "Seater"].map(type => (
-                                                <label key={type} className="flex items-center gap-3 text-sm font-bold text-slate-600 cursor-pointer group">
-                                                    <div className={cn(
-                                                        "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
-                                                        selectedBusTypes.includes(type) ? "bg-teal-600 border-teal-600 text-white" : "border-slate-200 group-hover:border-teal-400"
-                                                    )}>
-                                                        {selectedBusTypes.includes(type) && <Check className="h-3 w-3" />}
-                                                    </div>
-                                                    <input
-                                                        type="checkbox"
-                                                        className="hidden"
-                                                        checked={selectedBusTypes.includes(type)}
-                                                        onChange={() => toggleFilter(setSelectedBusTypes, type)}
-                                                    />
-                                                    <span>{type}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Boarding Points */}
-                                    {buses.length > 0 && (
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Boarding Points</label>
-                                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                                {getUniquePoints(buses, 'boarding').map(bp => (
-                                                    <label key={bp.id} className="flex items-center gap-3 text-sm font-bold text-slate-600 cursor-pointer group">
-                                                        <div className={cn(
-                                                            "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
-                                                            selectedBoardingPoints.includes(bp.name) ? "bg-teal-600 border-teal-600 text-white" : "border-slate-200 group-hover:border-teal-400"
-                                                        )}>
-                                                            {selectedBoardingPoints.includes(bp.name) && <Check className="h-3 w-3" />}
-                                                        </div>
-                                                        <input
-                                                            type="checkbox"
-                                                            className="hidden"
-                                                            checked={selectedBoardingPoints.includes(bp.name)}
-                                                            onChange={() => toggleFilter(setSelectedBoardingPoints, bp.name)}
-                                                        />
-                                                        <span className="truncate">{bp.name}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Dropping Points */}
-                                    {buses.length > 0 && (
-                                        <div>
-                                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Dropping Points</label>
-                                            <div className="space-y-3 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                                                {getUniquePoints(buses, 'dropping').map(dp => (
-                                                    <label key={dp.id} className="flex items-center gap-3 text-sm font-bold text-slate-600 cursor-pointer group">
-                                                        <div className={cn(
-                                                            "h-5 w-5 rounded-md border flex items-center justify-center transition-all",
-                                                            selectedDroppingPoints.includes(dp.name) ? "bg-teal-600 border-teal-600 text-white" : "border-slate-200 group-hover:border-teal-400"
-                                                        )}>
-                                                            {selectedDroppingPoints.includes(dp.name) && <Check className="h-3 w-3" />}
-                                                        </div>
-                                                        <input
-                                                            type="checkbox"
-                                                            className="hidden"
-                                                            checked={selectedDroppingPoints.includes(dp.name)}
-                                                            onChange={() => toggleFilter(setSelectedDroppingPoints, dp.name)}
-                                                        />
-                                                        <span className="truncate">{dp.name}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                                    <FilterContent
+                                        selectedBusTypes={selectedBusTypes}
+                                        setSelectedBusTypes={setSelectedBusTypes}
+                                        selectedBoardingPoints={selectedBoardingPoints}
+                                        setSelectedBoardingPoints={setSelectedBoardingPoints}
+                                        selectedDroppingPoints={selectedDroppingPoints}
+                                        setSelectedDroppingPoints={setSelectedDroppingPoints}
+                                        buses={buses}
+                                        getUniquePoints={getUniquePoints}
+                                        toggleFilter={toggleFilter}
+                                    />
                                 </CardContent>
                             </Card>
 
@@ -455,13 +392,173 @@ export default function SearchScreen() {
                 </div>
             </div>
 
+            {/* Mobile Filter Sidebar */}
+            <AnimatePresence>
+                {isFilterOpen && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsFilterOpen(false)}
+                            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm lg:hidden"
+                        />
+                        <motion.div
+                            initial={{ x: "-100%" }}
+                            animate={{ x: 0 }}
+                            exit={{ x: "-100%" }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className="fixed left-0 top-0 z-[101] h-screen w-[300px] bg-white shadow-2xl lg:hidden flex flex-col"
+                        >
+                            <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+                                <h3 className="font-black uppercase tracking-widest text-sm">Filters</h3>
+                                <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(false)} className="text-white hover:bg-white/10">
+                                    <X className="h-6 w-6" />
+                                </Button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                <FilterContent
+                                    selectedBusTypes={selectedBusTypes}
+                                    setSelectedBusTypes={setSelectedBusTypes}
+                                    selectedBoardingPoints={selectedBoardingPoints}
+                                    setSelectedBoardingPoints={setSelectedBoardingPoints}
+                                    selectedDroppingPoints={selectedDroppingPoints}
+                                    setSelectedDroppingPoints={setSelectedDroppingPoints}
+                                    buses={buses}
+                                    getUniquePoints={getUniquePoints}
+                                    toggleFilter={toggleFilter}
+                                />
+                            </div>
+                            <div className="p-6 border-t bg-slate-50">
+                                <Button
+                                    className="w-full bg-teal-600 hover:bg-teal-700 text-white font-black uppercase tracking-widest h-12 rounded-xl"
+                                    onClick={() => setIsFilterOpen(false)}
+                                >
+                                    Apply Filters
+                                </Button>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
             {/* Mobile Bottom Filter Bar */}
             <div className="lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-                <Button className="rounded-full bg-slate-900 text-white shadow-2xl px-8 h-12 font-black uppercase tracking-widest flex items-center gap-3">
+                <Button
+                    onClick={() => setIsFilterOpen(true)}
+                    className="rounded-full bg-slate-900 text-white shadow-2xl px-8 h-12 font-black uppercase tracking-widest flex items-center gap-3 active:scale-95 transition-transform"
+                >
                     <Filter className="h-4 w-4 text-teal-400" />
                     <span>Filter Results</span>
                 </Button>
             </div>
         </div>
     );
+
+    function FilterContent({
+        selectedBusTypes,
+        setSelectedBusTypes,
+        selectedBoardingPoints,
+        setSelectedBoardingPoints,
+        selectedDroppingPoints,
+        setSelectedDroppingPoints,
+        buses,
+        getUniquePoints,
+        toggleFilter
+    }: any) {
+        return (
+            <>
+                <div className="flex items-center justify-between lg:hidden mb-4">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setSelectedBusTypes([]);
+                            setSelectedBoardingPoints([]);
+                            setSelectedDroppingPoints([]);
+                        }}
+                        className="h-auto p-0 text-teal-600 font-bold uppercase text-[10px] tracking-widest"
+                    >
+                        Reset All
+                    </Button>
+                </div>
+
+                {/* Bus Type */}
+                <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Bus Type</label>
+                    <div className="space-y-4">
+                        {["AC", "Non-AC", "Sleeper", "Seater"].map(type => (
+                            <label key={type} className="flex items-center gap-4 text-sm font-bold text-slate-700 cursor-pointer group">
+                                <div className={cn(
+                                    "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                    selectedBusTypes.includes(type) ? "bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-100" : "border-slate-200 group-hover:border-teal-400"
+                                )}>
+                                    {selectedBusTypes.includes(type) && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                                </div>
+                                <input
+                                    type="checkbox"
+                                    className="hidden"
+                                    checked={selectedBusTypes.includes(type)}
+                                    onChange={() => toggleFilter(setSelectedBusTypes, type)}
+                                />
+                                <span>{type}</span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Boarding Points */}
+                {buses.length > 0 && (
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Boarding Points</label>
+                        <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {getUniquePoints(buses, 'boarding').map((bp: any) => (
+                                <label key={bp.id} className="flex items-center gap-4 text-sm font-bold text-slate-700 cursor-pointer group">
+                                    <div className={cn(
+                                        "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                        selectedBoardingPoints.includes(bp.name) ? "bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-100" : "border-slate-200 group-hover:border-teal-400"
+                                    )}>
+                                        {selectedBoardingPoints.includes(bp.name) && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={selectedBoardingPoints.includes(bp.name)}
+                                        onChange={() => toggleFilter(setSelectedBoardingPoints, bp.name)}
+                                    />
+                                    <span className="truncate">{bp.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Dropping Points */}
+                {buses.length > 0 && (
+                    <div>
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4 block">Dropping Points</label>
+                        <div className="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {getUniquePoints(buses, 'dropping').map((dp: any) => (
+                                <label key={dp.id} className="flex items-center gap-4 text-sm font-bold text-slate-700 cursor-pointer group">
+                                    <div className={cn(
+                                        "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                        selectedDroppingPoints.includes(dp.name) ? "bg-teal-600 border-teal-600 text-white shadow-lg shadow-teal-100" : "border-slate-200 group-hover:border-teal-400"
+                                    )}>
+                                        {selectedDroppingPoints.includes(dp.name) && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={selectedDroppingPoints.includes(dp.name)}
+                                        onChange={() => toggleFilter(setSelectedDroppingPoints, dp.name)}
+                                    />
+                                    <span className="truncate">{dp.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </>
+        );
+    }
 }

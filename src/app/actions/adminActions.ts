@@ -80,12 +80,38 @@ export async function getSchedulesByDateAction(date: string) {
     }
 }
 
-export async function getSchedulesAction(params?: { limit?: number; offset?: number; startDate?: string; endDate?: string; bus_id?: string; route_id?: string }) {
+import { getISTDayBounds } from "@/lib/utils";
+
+export async function getSchedulesAction(params?: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+    bus_id?: string;
+    route_id?: string;
+    dateFilter?: string;
+}) {
     try {
+        let start: Date | undefined = params?.startDate ? new Date(params.startDate) : undefined;
+        let end: Date | undefined = params?.endDate ? new Date(params.endDate) : undefined;
+
+        // If dateFilter is provided, use server-side IST bounds (preferred)
+        if (params?.dateFilter === "today") {
+            const bounds = getISTDayBounds(new Date());
+            start = bounds.start;
+            end = bounds.end;
+        } else if (params?.dateFilter === "tomorrow") {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const bounds = getISTDayBounds(tomorrow);
+            start = bounds.start;
+            end = bounds.end;
+        }
+
         const schedules = await adminService.getSchedules({
             ...params,
-            startDate: params?.startDate ? new Date(params.startDate) : undefined,
-            endDate: params?.endDate ? new Date(params.endDate) : undefined
+            startDate: start,
+            endDate: end
         });
         return { success: true, data: serialize(schedules) };
     } catch (error: any) {
