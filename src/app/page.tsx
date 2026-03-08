@@ -8,6 +8,8 @@ import { MapPin, TrendingUp, Star, ShieldCheck } from "lucide-react";
 import { getPopularRoutes, getBusImages } from "@/services/busService";
 import BusImageSlider from "@/screens/Home/BusImageSlider";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const popularRoutes = await getPopularRoutes();
   const busImages = await getBusImages();

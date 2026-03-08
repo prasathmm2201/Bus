@@ -10,7 +10,10 @@ const prismaClientSingleton = () => {
         throw new Error("Prisma Error: DATABASE_URL is not defined in environment variables");
     }
 
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+        connectionString: databaseUrl,
+        ssl: { rejectUnauthorized: false }
+    });
     const adapter = new PrismaPg(pool);
 
     return new PrismaClient({ adapter });
